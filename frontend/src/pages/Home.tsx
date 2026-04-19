@@ -113,7 +113,7 @@ export default function Home() {
             Models
           </a>
           <a
-            href="https://github.com/Sathv1kA/ai-cost-modeling-platform"
+            href="https://github.com/Sathv1kA/LLMeter"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
@@ -418,7 +418,7 @@ export default function Home() {
           <div>tokenlens · cost modeling for LLM codebases</div>
           <div className="opacity-70">
             <a
-              href="https://github.com/Sathv1kA/ai-cost-modeling-platform"
+              href="https://github.com/Sathv1kA/LLMeter"
               target="_blank"
               rel="noreferrer"
               className="hover:text-foreground"
