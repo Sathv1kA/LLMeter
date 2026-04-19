@@ -37,7 +37,12 @@ export default function Home() {
   const [models, setModels] = useState<PricingModel[] | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(((import.meta.env.VITE_API_BASE as string | undefined) ?? "").replace(/\/$/, "") + "/pricing")
+    fetch(
+      (
+        ((import.meta.env.VITE_API_BASE as string | undefined) ??
+          (import.meta.env.DEV ? "" : "/_/backend"))
+      ).replace(/\/$/, "") + "/pricing",
+    )
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("pricing"))))
       .then((data: PricingModel[]) => {
         if (!cancelled) setModels(data);

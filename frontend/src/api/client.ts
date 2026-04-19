@@ -3,12 +3,17 @@ import type { CostReport, StreamEvent } from "../types";
 /**
  * Base path for backend API calls.
  *
- * - In local dev, defaults to `""` so `/analyze` etc. hit the Vite proxy
- *   (configured in `vite.config.ts` → localhost:8000).
- * - In Vercel's multi-service deploy, set `VITE_API_BASE="/_/backend"` at
- *   build time so requests hit the Python service under that route prefix.
+ * - Local dev (`import.meta.env.DEV`): empty string so `/analyze` etc. hit the
+ *   Vite proxy (configured in `vite.config.ts` → localhost:8000).
+ * - Production: defaults to `/_/backend`, which matches the Vercel
+ *   `experimentalServices` route prefix in the repo-root `vercel.json`.
+ * - Override either via `VITE_API_BASE` at build time if you're deploying the
+ *   backend somewhere other than under that prefix.
  */
-const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+const API_BASE = (
+  (import.meta.env.VITE_API_BASE as string | undefined) ??
+  (import.meta.env.DEV ? "" : "/_/backend")
+).replace(/\/$/, "");
 
 function apiUrl(path: string): string {
   return API_BASE + path;
