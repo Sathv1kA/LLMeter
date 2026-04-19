@@ -1,6 +1,20 @@
 import type { CostReport, StreamEvent } from "../types";
 
 /**
+ * Base path for backend API calls.
+ *
+ * - In local dev, defaults to `""` so `/analyze` etc. hit the Vite proxy
+ *   (configured in `vite.config.ts` → localhost:8000).
+ * - In Vercel's multi-service deploy, set `VITE_API_BASE="/_/backend"` at
+ *   build time so requests hit the Python service under that route prefix.
+ */
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+
+function apiUrl(path: string): string {
+  return API_BASE + path;
+}
+
+/**
  * Opt-in LLM recommender config. When present, the backend asks the named
  * provider to judge each call shape with the supplied key. The key rides
  * in the request body (HTTPS) and is never echoed back; it is not stored.
@@ -89,7 +103,7 @@ function errorFromResponse(resp: Response, body: string): AnalyzeError {
 export async function fetchSharedReport(reportId: string): Promise<CostReport> {
   let resp: Response;
   try {
-    resp = await fetch(`/reports/${encodeURIComponent(reportId)}`);
+    resp = await fetch(apiUrl(`/reports/${encodeURIComponent(reportId)}`));
   } catch (e) {
     throw new AnalyzeError("network", `Network error: ${(e as Error).message}`);
   }
@@ -109,7 +123,7 @@ export async function analyzeRepo(
 ): Promise<void> {
   let resp: Response;
   try {
-    resp = await fetch("/analyze", {
+    resp = await fetch(apiUrl("/analyze"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

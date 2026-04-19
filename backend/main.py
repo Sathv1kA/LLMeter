@@ -30,6 +30,11 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    # Allow any Vercel production or preview domain. Harmless belt-and-
+    # suspenders since the multi-service deploy serves frontend + backend
+    # under the same origin, so cross-origin requests shouldn't happen in
+    # production. Still useful for local cross-origin testing.
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
