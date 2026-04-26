@@ -6,6 +6,7 @@ import {
   Download,
   FileJson,
   FileText,
+  FileType,
   Clock,
   KeyRound,
   Search,
@@ -29,7 +30,7 @@ import { providerMeta } from "../lib/providers";
 import { CountUp } from "../components/CountUp";
 import ReportView from "../components/ReportView";
 import ShareButton from "../components/ShareButton";
-import { downloadJson, downloadMarkdown } from "../utils/exporters";
+import { downloadJson, downloadMarkdown, downloadPdf } from "../utils/exporters";
 
 type AnalysisNavState = {
   githubToken?: string | null;
@@ -192,13 +193,13 @@ export default function Analysis() {
                       <button
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          downloadJson(report, repoName);
+                          downloadPdf(report, repoName);
                           setExportOpen(false);
                         }}
                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-card"
                       >
-                        <FileJson className="size-3.5" />
-                        Download JSON
+                        <FileType className="size-3.5" />
+                        Save as PDF
                       </button>
                       <button
                         onMouseDown={(e) => {
@@ -210,6 +211,17 @@ export default function Analysis() {
                       >
                         <FileText className="size-3.5" />
                         Download Markdown
+                      </button>
+                      <button
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          downloadJson(report, repoName);
+                          setExportOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-card"
+                      >
+                        <FileJson className="size-3.5" />
+                        Download JSON
                       </button>
                     </div>
                   )}

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, Download, FileJson, FileText } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Download, FileJson, FileText, FileType } from "lucide-react";
 import type { CostReport } from "../types";
 import { fetchSharedReport } from "../api/client";
 import ReportView from "../components/ReportView";
 import ShareButton from "../components/ShareButton";
 import { SummarySkeleton, TableSkeleton, CallTableSkeleton } from "../components/Skeleton";
-import { downloadJson, downloadMarkdown } from "../utils/exporters";
+import { downloadJson, downloadMarkdown, downloadPdf } from "../utils/exporters";
 
 type Phase = "loading" | "done" | "error";
 
@@ -130,13 +130,13 @@ export default function SharedReport() {
                     <button
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        downloadJson(report, repoName);
+                        downloadPdf(report, repoName);
                         setExportOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-background/60"
                     >
-                      <FileJson size={14} />
-                      Download JSON
+                      <FileType size={14} />
+                      Save as PDF
                     </button>
                     <button
                       onMouseDown={(e) => {
@@ -148,6 +148,17 @@ export default function SharedReport() {
                     >
                       <FileText size={14} />
                       Download Markdown
+                    </button>
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        downloadJson(report, repoName);
+                        setExportOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-background/60"
+                    >
+                      <FileJson size={14} />
+                      Download JSON
                     </button>
                   </div>
                 )}
