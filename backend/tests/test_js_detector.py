@@ -110,3 +110,49 @@ def test_langchain_map_loop_detection():
     if c.actual_cost_usd is not None:
         # Loose lower bound: looped call should cost roughly multiplier × single
         assert c.call_multiplier >= 2
+
+
+# ---------------------------------------------------------------------------
+# Vercel AI SDK — `import { generateText } from "ai"` and friends
+# ---------------------------------------------------------------------------
+
+def test_vercel_ai_generate_text_with_openai_helper():
+    calls = _scan("vercel_ai_basic.ts")
+    assert len(calls) == 1
+    c = calls[0]
+    # Re-attributed from "vercel-ai" to the underlying provider.
+    assert c.sdk == "openai"
+    assert c.model_hint == "gpt-4o"
+    assert c.resolved_model_id == "gpt-4o"
+    assert c.call_type == "chat"
+    assert c.max_output_tokens == 200
+    assert c.in_loop is False
+    assert c.actual_cost_usd is not None  # gpt-4o is in pricing table
+
+
+def test_vercel_ai_stream_text_anthropic_in_loop():
+    calls = _scan("vercel_ai_stream_anthropic.ts")
+    assert len(calls) == 1
+    c = calls[0]
+    # `anthropic("claude-...")` helper → SDK should rebind to anthropic
+    assert c.sdk == "anthropic"
+    assert c.model_hint == "claude-3-5-haiku-20241022"
+    assert c.resolved_model_id == "claude-3-5-haiku"
+    assert c.call_type == "stream"
+    assert c.in_loop is True
+    assert c.call_multiplier >= 2
+
+
+def test_vercel_ai_embed_google_with_user_defined_lookalike():
+    """`embed()` is also a common user-defined function name. The detector
+    must catch the real Vercel AI SDK call and ignore the wrapper that
+    has no `model:` kwarg."""
+    calls = _scan("vercel_ai_embed_google.ts")
+    assert len(calls) == 1, [
+        f"{c.line_number}: {c.raw_match}" for c in calls
+    ]
+    c = calls[0]
+    assert c.sdk == "gemini"  # google() helper → gemini SDK label
+    assert c.model_hint == "gemini-1.5-flash"
+    assert c.call_type == "embedding"
+    assert c.task_type == "embedding"

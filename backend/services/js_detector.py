@@ -38,7 +38,10 @@ VISION_INPUT_BUMP = 1000
 # We match on the trigger line; then we expand the region to the matching `)`.
 # ---------------------------------------------------------------------------
 
-# Each pattern is (sdk, compiled_regex, call_type_hint)
+# Each pattern is (sdk, compiled_regex, call_type_hint).
+# `sdk == "vercel-ai"` is a sentinel — at extraction time we re-attribute the
+# call to its actual provider (openai / anthropic / google / …) by looking at
+# the provider helper inside the kwargs (e.g. `model: openai("gpt-4o")`).
 TRIGGER_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     # OpenAI
     ("openai", re.compile(r"\w+\.chat\.completions\.create\s*\("), "chat"),
@@ -62,7 +65,41 @@ TRIGGER_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     # LangChain (JS)
     ("langchain", re.compile(r"\bllm\.invoke\s*\("), "chat"),
     ("langchain", re.compile(r"\bchain\.invoke\s*\("), "chat"),
+    # Vercel AI SDK — `import { generateText } from "ai"`
+    # Top-level helpers, called as plain functions (not on a client). We word-
+    # boundary-anchor so we don't accidentally match `obj.generateText(`,
+    # `await mygenerateText(`, or `customGenerateText(` from user code.
+    ("vercel-ai", re.compile(r"(?<![\w.])generateText\s*\("), "chat"),
+    ("vercel-ai", re.compile(r"(?<![\w.])streamText\s*\("), "stream"),
+    ("vercel-ai", re.compile(r"(?<![\w.])generateObject\s*\("), "chat"),
+    ("vercel-ai", re.compile(r"(?<![\w.])streamObject\s*\("), "stream"),
+    ("vercel-ai", re.compile(r"(?<![\w.])embed\s*\("), "embedding"),
+    ("vercel-ai", re.compile(r"(?<![\w.])embedMany\s*\("), "embedding"),
 ]
+
+# Provider helpers exported by the @ai-sdk/* packages. When a Vercel AI SDK
+# call has `model: openai("gpt-4o")` we treat it as an `openai` call so it
+# groups with first-party SDK calls in the report.
+VERCEL_PROVIDER_HELPER_RE = re.compile(
+    r"""\bmodel\s*:\s*(openai|anthropic|google|groq|mistral|cohere|xai|deepseek|bedrock|vertex|togetherai|perplexity|fireworks)\s*\(\s*['"]([^'"\n]+)['"]"""
+)
+# Maps the helper name → the SDK label we use everywhere else. Helpers we
+# don't recognize fall back to "vercel-ai".
+VERCEL_HELPER_TO_SDK: dict[str, str] = {
+    "openai": "openai",
+    "anthropic": "anthropic",
+    "google": "gemini",
+    "groq": "groq",
+    "mistral": "mistral",
+    "cohere": "cohere",
+    "xai": "xai",
+    "deepseek": "deepseek",
+    "bedrock": "anthropic",   # most commonly Claude on Bedrock
+    "vertex": "gemini",       # most commonly Gemini on Vertex
+    "togetherai": "openai",   # closest tokenizer family
+    "perplexity": "openai",
+    "fireworks": "openai",
+}
 
 # Detect constructor calls that bind a variable → SDK (for .invoke attribution)
 CTOR_PATTERNS: list[tuple[str, re.Pattern]] = [
@@ -344,13 +381,32 @@ def scan_js_file(file_path: str, content: str) -> List[DetectedCall]:
 
         # ---- kwarg extraction ----
         model_hint: Optional[str] = None
-        m = MODEL_LITERAL_RE.search(region)
-        if m:
-            model_hint = m.group(1)
-        else:
-            mi = MODEL_IDENT_RE.search(region)
-            if mi and mi.group(1) in string_consts:
-                model_hint = string_consts[mi.group(1)]
+
+        # Vercel AI SDK: `model: openai("gpt-4o")` — pull the model id from
+        # inside the provider helper, and re-attribute the call's SDK label
+        # to the helper's underlying provider so the per-SDK rollup is right.
+        if sdk == "vercel-ai":
+            vh = VERCEL_PROVIDER_HELPER_RE.search(region)
+            if vh:
+                helper, model_str = vh.group(1), vh.group(2)
+                model_hint = model_str
+                sdk = VERCEL_HELPER_TO_SDK.get(helper, "vercel-ai")
+            else:
+                # No provider helper anywhere in the region — almost certainly
+                # a user-defined function that happens to share a name with
+                # an `ai` package export (`embed`, `generateText`, etc.).
+                # Drop the false positive rather than report a phantom call.
+                if not MODEL_LITERAL_RE.search(region):
+                    continue
+
+        if model_hint is None:
+            m = MODEL_LITERAL_RE.search(region)
+            if m:
+                model_hint = m.group(1)
+            else:
+                mi = MODEL_IDENT_RE.search(region)
+                if mi and mi.group(1) in string_consts:
+                    model_hint = string_consts[mi.group(1)]
 
         resolved_model_id = resolve_model_id(model_hint)
 

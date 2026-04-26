@@ -1,16 +1,12 @@
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { BarChart2, ChevronDown, ChevronUp, X } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 import type { ModelCostSummary } from "../types";
 import { fmtCost, fmtPercent, fmtTokens } from "../utils/formatters";
+import type { ComparisonRow } from "./CostTableCharts";
+
+// Code-split the recharts-using charts. They pull ~150 KB of recharts code
+// that nobody who never clicks "Chart" should pay for.
+const CostTableCharts = lazy(() => import("./CostTableCharts"));
 
 const PROVIDER_COLORS: Record<string, string> = {
   openai: "oklch(0.74 0.16 155)",
@@ -24,11 +20,16 @@ const PROVIDER_COLORS: Record<string, string> = {
   deepseek: "oklch(0.74 0.12 210)",
 };
 
-const BAR_COLORS = {
-  declared: "oklch(0.5 0.01 270)",
-  selected: "oklch(0.78 0.16 70)",
-  benchmark: "oklch(0.74 0.17 155)",
-} as const;
+function ChartFallback({ height }: { height: number }) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-sm border border-dashed border-border/60 text-xs text-muted-foreground"
+      style={{ height }}
+    >
+      Loading chart…
+    </div>
+  );
+}
 
 interface Props {
   summaries: ModelCostSummary[];
@@ -63,9 +64,9 @@ export default function CostTable({ summaries, actualTotalCostUsd }: Props) {
     provider: s.provider,
   }));
 
-  const comparisonData = useMemo(() => {
+  const comparisonData = useMemo<ComparisonRow[]>(() => {
     if (!selected || !cheapest) return [];
-    const rows: { key: string; label: string; value: number; kind: keyof typeof BAR_COLORS }[] = [];
+    const rows: ComparisonRow[] = [];
     if (actualTotalCostUsd != null && actualTotalCostUsd > 0) {
       rows.push({
         key: "declared",
@@ -93,15 +94,6 @@ export default function CostTable({ summaries, actualTotalCostUsd }: Props) {
 
   function toggleSelect(id: string) {
     setSelectedId((cur) => (cur === id ? null : id));
-  }
-
-  function handleBarClick(entry: { model_id?: string } | undefined) {
-    if (entry?.model_id) toggleSelect(entry.model_id);
-  }
-
-  /** Recharts Bar onClick passes BarRectangleItem with `payload` = chart row. */
-  function onBarRectangleClick(item: { payload?: { model_id?: string } }) {
-    handleBarClick(item.payload);
   }
 
   return (
@@ -237,48 +229,14 @@ export default function CostTable({ summaries, actualTotalCostUsd }: Props) {
       )}
 
       {view === "chart" && (
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
-            <XAxis
-              type="number"
-              tickFormatter={(v) => fmtCost(v)}
-              tick={{ fontSize: 11, fill: "oklch(0.6 0.01 270)" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              width={110}
-              tick={{ fontSize: 11, fill: "oklch(0.85 0.005 270)" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              formatter={(v) => fmtCost(Number(v))}
-              cursor={{ fill: "oklch(0.85 0.18 65 / 0.08)" }}
-              contentStyle={{
-                background: "oklch(0.2 0.012 270)",
-                border: "1px solid oklch(0.32 0.012 270)",
-                borderRadius: 4,
-                fontSize: 12,
-                color: "oklch(0.95 0.005 270)",
-              }}
-            />
-            <Bar dataKey="cost" radius={[0, 2, 2, 0]} cursor="pointer" onClick={onBarRectangleClick}>
-              {chartData.map((d) => (
-                <Cell
-                  key={d.model_id}
-                  fill={
-                    selectedId === d.model_id
-                      ? "var(--primary)"
-                      : PROVIDER_COLORS[d.provider] ?? "var(--muted-foreground)"
-                  }
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <Suspense fallback={<ChartFallback height={280} />}>
+          <CostTableCharts
+            mode="model-costs"
+            data={chartData}
+            selectedId={selectedId}
+            onSelect={toggleSelect}
+          />
+        </Suspense>
       )}
 
       {selected && comparisonData.length > 0 && (
@@ -303,40 +261,13 @@ export default function CostTable({ summaries, actualTotalCostUsd }: Props) {
               <X size={18} />
             </button>
           </div>
-          <ResponsiveContainer width="100%" height={Math.max(140, comparisonData.length * 48)}>
-            <BarChart data={comparisonData} layout="vertical" margin={{ left: 4, right: 16 }}>
-              <XAxis
-                type="number"
-                tickFormatter={(v) => fmtCost(v)}
-                tick={{ fontSize: 11, fill: "oklch(0.6 0.01 270)" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                width={200}
-                tick={{ fontSize: 10, fill: "oklch(0.85 0.005 270)" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                formatter={(v) => fmtCost(Number(v))}
-                contentStyle={{
-                  background: "oklch(0.2 0.012 270)",
-                  border: "1px solid oklch(0.32 0.012 270)",
-                  borderRadius: 4,
-                  fontSize: 12,
-                  color: "oklch(0.95 0.005 270)",
-                }}
-              />
-              <Bar dataKey="value" radius={[0, 2, 2, 0]} name="Cost">
-                {comparisonData.map((d) => (
-                  <Cell key={d.key} fill={BAR_COLORS[d.kind]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <Suspense
+            fallback={
+              <ChartFallback height={Math.max(140, comparisonData.length * 48)} />
+            }
+          >
+            <CostTableCharts mode="what-if" data={comparisonData} />
+          </Suspense>
           <p className="mt-2 text-xs text-muted-foreground">
             What-if uses the same estimated input/output tokens (including loop multipliers) as the rest of the report.
           </p>
