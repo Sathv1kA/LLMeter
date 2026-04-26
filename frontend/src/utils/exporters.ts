@@ -223,6 +223,22 @@ function buildPdfHtml(report: CostReport, repoName: string): string {
     .sort((a, b) => b.actual_cost_usd - a.actual_cost_usd)
     .slice(0, 15);
 
+  // Projection setup. All entries in `report.projections` share the same
+  // calls_per_day (set when the user kicked off the analysis). Sort cheapest
+  // monthly first so the table reads "you should be paying around $X" → up.
+  const projections = [...report.projections].sort(
+    (a, b) => a.monthly_cost_usd - b.monthly_cost_usd,
+  );
+  const callsPerDay = projections[0]?.calls_per_day ?? 0;
+  // Project the user's *declared* spend (the mix of models actually written
+  // in code) to monthly. We can't read it off `report.projections` because
+  // those are "if every call went to model X" — but we have the call sites
+  // and their actual_cost_usd in `report.actual_total_cost_usd`.
+  const monthlyAtDeclared =
+    report.actual_total_cost_usd != null && report.total_call_sites > 0 && callsPerDay > 0
+      ? (report.actual_total_cost_usd / report.total_call_sites) * callsPerDay * 30
+      : null;
+
   const sdkChips = report.detected_sdks
     .map((s) => `<span class="chip">${escapeHtml(s)}</span>`)
     .join(" ");
@@ -256,13 +272,14 @@ function buildPdfHtml(report: CostReport, repoName: string): string {
     .cover .meta { text-align: right; font-size: 9pt; color: #6b7280; }
     .cover .meta .stamp { font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
 
-    /* Hero metrics — 4 cells, deterministic order. */
-    .hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10pt; margin-bottom: 10pt; }
-    .hero .cell { padding: 12pt 12pt; border: 1px solid #e5e7eb; border-radius: 4pt; }
-    .hero .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin-bottom: 4pt; }
-    .hero .val { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 18pt; font-weight: 600; letter-spacing: -0.02em; }
+    /* Hero metrics — 5 cells, deterministic order. */
+    .hero { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8pt; margin-bottom: 10pt; }
+    .hero .cell { padding: 10pt 11pt; border: 1px solid #e5e7eb; border-radius: 4pt; }
+    .hero .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin-bottom: 4pt; }
+    .hero .val { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 16pt; font-weight: 600; letter-spacing: -0.02em; }
     .hero .val.green { color: #047857; }
-    .hero .sub { font-size: 8.5pt; color: #6b7280; margin-top: 2pt; }
+    .hero .val.blue { color: #1d4ed8; }
+    .hero .sub { font-size: 8pt; color: #6b7280; margin-top: 2pt; }
 
     .chip { display: inline-block; padding: 1pt 7pt; border: 1px solid #d1d5db; border-radius: 999px; font-size: 8.5pt; color: #374151; margin-right: 4pt; background: #f9fafb; }
     .meta-row { display: flex; gap: 18pt; flex-wrap: wrap; font-size: 9pt; color: #4b5563; margin: 8pt 0 4pt; }
@@ -403,7 +420,50 @@ function buildPdfHtml(report: CostReport, repoName: string): string {
       <div class="val green">${heroSavings}</div>
       <div class="sub">${savingsRatio != null ? fmtPct(savingsRatio) + " of current spend" : "no resolved models"}</div>
     </div>
+    <div class="cell">
+      <div class="label">Monthly @ ${callsPerDay.toLocaleString()}/day</div>
+      <div class="val blue">${monthlyAtDeclared != null ? fmtCost(monthlyAtDeclared) : "—"}</div>
+      <div class="sub">${
+        callsPerDay > 0
+          ? "projected from declared models · 30-day"
+          : "set calls/day in Advanced options"
+      }</div>
+    </div>
   </section>
+
+  ${
+    projections.length > 0 && callsPerDay > 0
+      ? `<h2>Monthly projection @ ${callsPerDay.toLocaleString()} calls/day</h2>
+  <p class="muted" style="margin: 0 0 8pt; font-size:9pt;">Daily and monthly cost if every detected call site fired ${callsPerDay.toLocaleString()} times per day at each model's list price. Sorted cheapest monthly first.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th class="num">Per call avg</th>
+        <th class="num">Daily</th>
+        <th class="num">Monthly</th>
+        <th class="num">Annual</th>
+      </tr>
+    </thead>
+    <tbody>${projections
+      .map((p) => {
+        const isCheapest = p === projections[0];
+        return `<tr class="${isCheapest ? "cheapest" : ""}">
+          <td>${escapeHtml(p.display_name)}</td>
+          <td class="num muted">${
+            callsPerDay > 0
+              ? fmtCost(p.daily_cost_usd / callsPerDay)
+              : "—"
+          }</td>
+          <td class="num">${fmtCost(p.daily_cost_usd)}</td>
+          <td class="num"><b>${fmtCost(p.monthly_cost_usd)}</b></td>
+          <td class="num muted">${fmtCost(p.monthly_cost_usd * 12)}</td>
+        </tr>`;
+      })
+      .join("")}</tbody>
+  </table>`
+      : ""
+  }
 
   ${
     summaries.length > 0

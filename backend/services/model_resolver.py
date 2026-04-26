@@ -259,6 +259,38 @@ FAMILY_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"^command-r7b"), "command-r7b"),
     (re.compile(r"^command-r"), "command-r"),
     (re.compile(r"^command-"), "command-r"),
+
+    # ---- AWS Bedrock model IDs (provider-prefixed). Often suffixed with
+    # `-v1:0`, `-v2:0`, region prefixes (`us.`, `eu.`), or `-cross-region`. ----
+    # Anthropic on Bedrock — strip `(?:us|eu|apac)\.` prefix, route by family.
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-(?:opus|sonnet)-4-7"), "claude-opus-4-7"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-sonnet-4-6"), "claude-sonnet-4-6"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-haiku-4-5"), "claude-haiku-4-5"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-opus-4"), "claude-opus-4"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-sonnet-4"), "claude-sonnet-4"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-7-sonnet"), "claude-3-7-sonnet"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-5-sonnet"), "claude-3-5-sonnet"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-5-haiku"), "claude-3-5-haiku"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-haiku"), "claude-3-haiku"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-opus"), "claude-3-opus"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-3-sonnet"), "claude-3-5-sonnet"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?anthropic\.claude-instant"), "claude-3-haiku"),
+    # Meta Llama on Bedrock
+    (re.compile(r"^(?:[a-z]{2,4}\.)?meta\.llama3-?3-70b"), "llama-3.3-70b-groq"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?meta\.llama3-?1-8b"), "llama-3.1-8b-groq"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?meta\.llama3-70b"), "llama-3-70b-groq"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?meta\.llama3-8b"), "llama-3-8b-groq"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?meta\.llama-?4-scout"), "llama-4-scout-groq"),
+    # Mistral on Bedrock
+    (re.compile(r"^(?:[a-z]{2,4}\.)?mistral\.mistral-large"), "mistral-large"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?mistral\.mistral-small"), "mistral-small"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?mistral\.mistral-7b"), "mistral-7b"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?mistral\.mixtral-8x7b"), "mistral-7b"),  # closest priced model
+    # Cohere on Bedrock
+    (re.compile(r"^(?:[a-z]{2,4}\.)?cohere\.command-r-plus"), "command-r-plus"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?cohere\.command-r"), "command-r"),
+    (re.compile(r"^(?:[a-z]{2,4}\.)?cohere\.command-light"), "command-r"),
+    # Amazon Titan / Nova have no equivalent in our catalog — leave unresolved.
 ]
 
 

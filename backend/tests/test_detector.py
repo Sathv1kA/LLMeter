@@ -134,3 +134,35 @@ def test_syntax_error_falls_back_to_regex():
     # Regex path should still detect the trigger
     assert any(c.sdk == "openai" for c in calls)
     assert all(c.detection_method == "regex" for c in calls)
+
+
+# ---------------------------------------------------------------------------
+# AWS Bedrock — boto3 invoke_model with namespaced model IDs
+# ---------------------------------------------------------------------------
+
+def test_bedrock_python_invoke_model_anthropic_namespace():
+    content = (FIXTURES / "bedrock_python.py").read_text()
+    calls = scan_file("bedrock_python.py", content)
+    by_model = {c.model_hint: c for c in calls}
+
+    # Claude on Bedrock — re-attributed to anthropic, model resolved by alias.
+    claude = by_model.get("anthropic.claude-3-5-haiku-20241022-v1:0")
+    assert claude is not None
+    assert claude.sdk == "anthropic"
+    assert claude.resolved_model_id == "claude-3-5-haiku"
+    assert claude.detection_method == "ast"
+    assert claude.actual_cost_usd is not None
+
+
+def test_bedrock_python_invoke_model_meta_namespace_streams():
+    content = (FIXTURES / "bedrock_python.py").read_text()
+    calls = scan_file("bedrock_python.py", content)
+    by_model = {c.model_hint: c for c in calls}
+
+    llama = by_model.get("meta.llama3-70b-instruct-v1:0")
+    assert llama is not None
+    # meta.* on Bedrock → groq label (closest priced Llama family in catalog).
+    assert llama.sdk == "groq"
+    assert llama.resolved_model_id == "llama-3-70b-groq"
+    # invoke_model_with_response_stream is the streaming variant.
+    assert llama.call_type == "stream"

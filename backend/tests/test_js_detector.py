@@ -143,6 +143,31 @@ def test_vercel_ai_stream_text_anthropic_in_loop():
     assert c.call_multiplier >= 2
 
 
+def test_bedrock_js_invoke_model_command_anthropic():
+    calls = _scan("bedrock_js.ts")
+    # Expect exactly one InvokeModelCommand and one ConverseCommand.
+    assert len(calls) == 2, [c.raw_match for c in calls]
+    by_model = {c.model_hint: c for c in calls}
+    invoke = by_model.get("us.anthropic.claude-3-5-sonnet-20241022-v2:0")
+    assert invoke is not None
+    # Re-attributed from "bedrock" to its underlying provider.
+    assert invoke.sdk == "anthropic"
+    # Region prefix + version suffix should still resolve.
+    assert invoke.resolved_model_id == "claude-3-5-sonnet"
+    assert invoke.actual_cost_usd is not None
+
+
+def test_bedrock_js_converse_cohere():
+    calls = _scan("bedrock_js.ts")
+    converse = next(
+        (c for c in calls if c.model_hint == "cohere.command-r-plus-v1:0"),
+        None,
+    )
+    assert converse is not None
+    assert converse.sdk == "cohere"
+    assert converse.resolved_model_id == "command-r-plus"
+
+
 def test_vercel_ai_embed_google_with_user_defined_lookalike():
     """`embed()` is also a common user-defined function name. The detector
     must catch the real Vercel AI SDK call and ignore the wrapper that

@@ -271,7 +271,20 @@ export default function CallBreakdown({ calls, summaries }: Props) {
                           {fmtTokens(call.estimated_input_tokens)} / {fmtTokens(call.estimated_output_tokens)}
                         </td>
                         <td className="py-2 text-right font-mono text-xs font-semibold tabular-nums text-foreground">
-                          {fmtCost(callCost)}
+                          <div>{fmtCost(callCost)}</div>
+                          {call.recommended_model_id &&
+                            call.potential_savings_usd != null &&
+                            call.potential_savings_usd > 0 && (
+                              <div
+                                className="mt-0.5 inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300"
+                                title={`Switch to ${call.recommended_model_id} to save ${fmtCost(call.potential_savings_usd)} per call`}
+                              >
+                                <Sparkles size={10} className="shrink-0" />
+                                <span className="font-mono">
+                                  −{fmtCost(call.potential_savings_usd)}
+                                </span>
+                              </div>
+                            )}
                         </td>
                       </tr>
                       {isOpen && (

@@ -65,6 +65,16 @@ TRIGGER_PATTERNS: list[tuple[str, re.Pattern, str]] = [
     # LangChain (JS)
     ("langchain", re.compile(r"\bllm\.invoke\s*\("), "chat"),
     ("langchain", re.compile(r"\bchain\.invoke\s*\("), "chat"),
+    # AWS Bedrock — boto3-style direct invocation. Tagged "bedrock" then
+    # re-attributed below to the underlying provider once we've seen the
+    # `modelId` value (anthropic.* → anthropic, meta.* → meta, etc.).
+    ("bedrock", re.compile(r"\w+\.invoke_model_with_response_stream\s*\("), "stream"),
+    ("bedrock", re.compile(r"\w+\.invoke_model\s*\("), "chat"),
+    # AWS Bedrock JS / Node SDK style: client.send(new InvokeModelCommand({...}))
+    ("bedrock", re.compile(r"new\s+InvokeModel(?:WithResponseStream)?Command\s*\("), "chat"),
+    # AWS Bedrock Converse API (newer, unified)
+    ("bedrock", re.compile(r"\w+\.converse(?:_stream)?\s*\("), "chat"),
+    ("bedrock", re.compile(r"new\s+Converse(?:Stream)?Command\s*\("), "chat"),
     # Vercel AI SDK — `import { generateText } from "ai"`
     # Top-level helpers, called as plain functions (not on a client). We word-
     # boundary-anchor so we don't accidentally match `obj.generateText(`,
@@ -101,6 +111,30 @@ VERCEL_HELPER_TO_SDK: dict[str, str] = {
     "fireworks": "openai",
 }
 
+
+# Bedrock model IDs are namespaced: `anthropic.claude-…`, `meta.llama-…`,
+# `mistral.…`, `cohere.…`, `amazon.…`. Map the namespace prefix back to the
+# SDK label our rollups use.
+def _bedrock_sdk_from_model_id(model_id: str) -> str:
+    """Strip optional region prefix (`us.`, `eu.`, `apac.`) and look at the
+    provider namespace to pick the right SDK label."""
+    s = model_id.lower()
+    # Optional region prefix
+    if "." in s:
+        head, rest = s.split(".", 1)
+        if head in {"us", "eu", "apac", "ap"} and "." in rest:
+            s = rest
+    if s.startswith("anthropic."):
+        return "anthropic"
+    if s.startswith("meta."):
+        return "groq"  # closest priced family in our catalog (Llama)
+    if s.startswith("mistral."):
+        return "mistral"
+    if s.startswith("cohere."):
+        return "cohere"
+    # amazon.titan / amazon.nova have no equivalent — stay tagged "bedrock"
+    return "bedrock"
+
 # Detect constructor calls that bind a variable → SDK (for .invoke attribution)
 CTOR_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("langchain", re.compile(r"\b(?:const|let|var)\s+(\w+)\s*=\s*new\s+ChatOpenAI\s*\(")),
@@ -118,9 +152,10 @@ STRING_CONST_RE = re.compile(
     r"""\b(?:const|let|var)?\s*(\w+)\s*[:=]\s*["']([^"'\n]+)["']"""
 )
 
-# Kwarg extraction from a call region
-MODEL_LITERAL_RE = re.compile(r"""\bmodel\s*[:=]\s*["']([^"'\n]+)["']""")
-MODEL_IDENT_RE = re.compile(r"""\bmodel\s*[:=]\s*([A-Za-z_][A-Za-z0-9_]*)\b""")
+# Kwarg extraction from a call region.
+# Bedrock uses `modelId` (boto3 keyword and JS SDK field).
+MODEL_LITERAL_RE = re.compile(r"""\b(?:model|modelId|modelID|model_id)\s*[:=]\s*["']([^"'\n]+)["']""")
+MODEL_IDENT_RE = re.compile(r"""\b(?:model|modelId|modelID|model_id)\s*[:=]\s*([A-Za-z_][A-Za-z0-9_]*)\b""")
 MAX_TOKENS_RE = re.compile(r"""\bmax_?tokens\s*[:=]\s*(\d+)""", re.IGNORECASE)
 MAX_OUTPUT_TOKENS_RE = re.compile(r"""\bmax_?(?:output_?|completion_?)tokens\s*[:=]\s*(\d+)""", re.IGNORECASE)
 STREAM_RE = re.compile(r"""\bstream\s*[:=]\s*true""", re.IGNORECASE)
@@ -407,6 +442,11 @@ def scan_js_file(file_path: str, content: str) -> List[DetectedCall]:
                 mi = MODEL_IDENT_RE.search(region)
                 if mi and mi.group(1) in string_consts:
                     model_hint = string_consts[mi.group(1)]
+
+        # Bedrock direct calls — re-tag the SDK from the modelId namespace
+        # (`anthropic.claude-…` → anthropic, `meta.llama-…` → groq family).
+        if sdk == "bedrock" and model_hint:
+            sdk = _bedrock_sdk_from_model_id(model_hint)
 
         resolved_model_id = resolve_model_id(model_hint)
 

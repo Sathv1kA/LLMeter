@@ -65,8 +65,33 @@ CHAIN_PATTERNS: tuple[ChainPattern, ...] = (
     ChainPattern("cohere", ("generate",), "completion"),
     ChainPattern("cohere", ("embed",), "embedding"),
     ChainPattern("cohere", ("rerank",), "chat"),
+    # AWS Bedrock — boto3 client.invoke_model / converse. Initially tagged
+    # "bedrock"; the visitor re-attributes to the underlying provider once
+    # we've extracted modelId (namespace tells us anthropic / meta / mistral / …).
+    ChainPattern("bedrock", ("invoke_model",), "chat"),
+    ChainPattern("bedrock", ("invoke_model_with_response_stream",), "stream"),
+    ChainPattern("bedrock", ("converse",), "chat"),
+    ChainPattern("bedrock", ("converse_stream",), "stream"),
     # LangChain / LlamaIndex — handled separately via constructor map
 )
+
+
+def _bedrock_sdk_from_model_id(model_id: str) -> str:
+    """Strip optional region prefix and route by Bedrock namespace."""
+    s = model_id.lower()
+    if "." in s:
+        head, rest = s.split(".", 1)
+        if head in {"us", "eu", "apac", "ap"} and "." in rest:
+            s = rest
+    if s.startswith("anthropic."):
+        return "anthropic"
+    if s.startswith("meta."):
+        return "groq"  # closest priced Llama family
+    if s.startswith("mistral."):
+        return "mistral"
+    if s.startswith("cohere."):
+        return "cohere"
+    return "bedrock"
 
 # Constructor names → SDK label. When a variable is bound to a call of one of
 # these, subsequent `.invoke` / `.ainvoke` / `.stream` / `.predict` on that
@@ -271,15 +296,26 @@ class _Detector(ast.NodeVisitor):
             return
 
         # ---- kwarg extraction ----
-        # model=
+        # model= / model_name= / deployment= / modelId= (Bedrock).
         if model_hint is None:
-            kw = _get_kwarg(node, "model") or _get_kwarg(node, "model_name") or _get_kwarg(node, "deployment")
+            kw = (
+                _get_kwarg(node, "model")
+                or _get_kwarg(node, "model_name")
+                or _get_kwarg(node, "deployment")
+                or _get_kwarg(node, "modelId")     # Bedrock boto3 / SDK
+                or _get_kwarg(node, "model_id")    # snake-case variant some libs use
+            )
             if kw is not None:
                 literal = _const_string(kw)
                 if literal:
                     model_hint = literal
                 elif isinstance(kw, ast.Name) and kw.id in self.name_strings:
                     model_hint = self.name_strings[kw.id]
+
+        # Bedrock: rewrite the SDK label to the underlying provider once we
+        # know the model namespace (anthropic.* / meta.* / mistral.* / …).
+        if sdk == "bedrock" and model_hint:
+            sdk = _bedrock_sdk_from_model_id(model_hint)
 
         resolved_model_id = resolve_model_id(model_hint)
 
