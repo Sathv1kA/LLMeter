@@ -1,11 +1,13 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AnalyzeRequest(BaseModel):
     repo_url: str
     github_token: Optional[str] = None
-    calls_per_day: int = 1000
+    # Bounded so a typo or malicious caller can't blow up the projection math.
+    # Upper bound is generous (10M/day ≈ 115/sec) but finite.
+    calls_per_day: int = Field(default=1000, ge=1, le=10_000_000)
     # Optional: use a real LLM to judge which model is best for each call.
     # Requires an API key. Falls back to the built-in heuristic on any error
     # so an invalid key or network blip doesn't break the analysis.

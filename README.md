@@ -1,6 +1,8 @@
-# AI Cost Modeling Platform
+# TokenLens
 
-A tool that analyzes any public GitHub repository, detects every LLM API call in the codebase, estimates token usage with a real tokenizer, and computes what those calls would cost across 14+ AI models — including a recommender that suggests cheaper alternatives per call site.
+TokenLens analyzes any public GitHub repository, detects every LLM API call in the codebase, estimates token usage with a real tokenizer, and computes what those calls would cost across 14+ AI models — including a recommender that suggests cheaper alternatives per call site.
+
+Live demo: <https://osutokenlens.vercel.app>
 
 ---
 
@@ -24,7 +26,7 @@ A tool that analyzes any public GitHub repository, detects every LLM API call in
 
 1. You paste a GitHub repository URL.
 2. The backend fetches every source file from that repo using the GitHub API.
-3. Each file is scanned with regex patterns that identify LLM SDK calls (OpenAI, Anthropic, LangChain, LlamaIndex, Cohere, Gemini).
+3. Each file is scanned for LLM SDK calls (OpenAI, Anthropic, LangChain, LlamaIndex, Cohere, Gemini). Python files go through an AST detector for precise kwarg extraction; JS/TS/notebook code falls through to a regex detector.
 4. For each detected call, the tool:
    - Extracts the model name declared in the code (e.g. `model="gpt-4o-2024-08-06"`)
    - Resolves that to a canonical pricing ID
@@ -338,7 +340,6 @@ while True:
 | `Recommendations` | Ranked list of swap opportunities with current → recommended model, savings, and rationale |
 | `FileBreakdowns` | Per-file aggregate (call count, tokens, cost, SDKs) with expandable call list |
 | `CallBreakdown` | Full paginated call table with search, SDK filter, sort, and expandable rows with syntax-highlighted code |
-| `ThemeToggle` | Sun/Moon button that switches between light and dark mode (persisted to localStorage) |
 
 ### State & Streaming
 
@@ -361,9 +362,9 @@ while (true) {
 }
 ```
 
-### Dark Mode
+### Theming
 
-Tailwind's `darkMode: "class"` strategy is used. `ThemeProvider` adds/removes the `dark` class on `<html>` and persists the preference to `localStorage`. It also reads `prefers-color-scheme` on first load.
+The UI is dark-only — `<html class="dark">` is hard-coded in `index.html` and Tailwind variables drive every surface, accent, and chip via OKLCH tokens.
 
 ### Code Splitting
 
@@ -511,19 +512,17 @@ Ai-Cost-Modeling-Platform/
     ├── vite.config.ts
     ├── tailwind.config.js         # darkMode: "class"
     └── src/
-        ├── App.tsx                # Router + ThemeProvider + lazy page loading
+        ├── App.tsx                # Router + lazy page loading
         ├── types/index.ts         # All TypeScript interfaces
         ├── api/
         │   └── client.ts          # Streaming NDJSON fetch logic
-        ├── theme/
-        │   └── ThemeProvider.tsx  # Dark mode context + localStorage
         ├── utils/
         │   └── formatters.ts      # fmtCost, fmtTokens, fmtPercent
         ├── pages/
         │   ├── Home.tsx           # Landing page
-        │   └── Analysis.tsx       # Results page
+        │   ├── Analysis.tsx       # Results page
+        │   └── SharedReport.tsx   # /r/:id share-link viewer
         └── components/
-            ├── ThemeToggle.tsx    # Sun/Moon button
             ├── SummaryCard.tsx    # Stats bar + savings comparison
             ├── CostTable.tsx      # 14-model table + bar chart toggle
             ├── CostProjection.tsx # Log-scale slider + projection table
@@ -551,5 +550,5 @@ The tool estimates tokens from prompt snippets found near the call site. In prod
 **GitHub API rate limits**
 Without a token: 60 requests/hour. Large repos (1,000+ files) will hit this. The error message prompts users to add a Personal Access Token in the Advanced options panel.
 
-**No auth, no persistence**
-The tool is stateless. Every analysis runs fresh. There is no database, no user accounts, and no result caching. Each request fetches and scans the repo from scratch.
+**Lightweight share cache, no accounts**
+Each completed report is persisted to a small SQLite cache so it can be re-rendered via a short `/r/<id>` URL without re-running the scan. There are no user accounts. On read-only filesystems (e.g. Vercel serverless) the cache transparently falls back to `/tmp`; if even that fails, share links are disabled and the rest of the app keeps working.

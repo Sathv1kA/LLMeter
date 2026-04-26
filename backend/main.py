@@ -8,7 +8,7 @@ from routers.analyze import router as analyze_router
 from routers.reports import router as reports_router
 from services.rate_limit import limiter
 
-app = FastAPI(title="AI Cost Modeling Platform", version="2.0.0")
+app = FastAPI(title="TokenLens", version="2.0.0")
 
 # Rate limiter state + 429 handler
 app.state.limiter = limiter

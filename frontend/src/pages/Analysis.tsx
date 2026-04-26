@@ -43,7 +43,13 @@ export default function Analysis() {
   const location = useLocation();
   const navState = (location.state ?? null) as AnalysisNavState | null;
   const repoUrl = params.get("repo") ?? "";
-  const callsPerDay = Number(params.get("cpd") ?? "1000");
+  // Clamp to the same bounds the backend enforces, so a tampered URL
+  // doesn't trigger a 422 before we even start.
+  const rawCpd = Number(params.get("cpd") ?? "1000");
+  const callsPerDay = Math.max(
+    1,
+    Math.min(10_000_000, Number.isFinite(rawCpd) ? rawCpd : 1000),
+  );
 
   // Secrets come via router state (never URL params — no history/referer leak).
   // Captured into a ref on first render so replacing history state doesn't

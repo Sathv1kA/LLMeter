@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, ChevronDown, GitBranch, KeyRound } from "lucide-react";
 import { providerMeta } from "../lib/providers";
+import { apiUrl } from "../api/client";
 
 /**
  * Landing page — editorial layout inspired by the cost-clarity-hub design:
@@ -37,12 +38,7 @@ export default function Home() {
   const [models, setModels] = useState<PricingModel[] | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch(
-      (
-        ((import.meta.env.VITE_API_BASE as string | undefined) ??
-          (import.meta.env.DEV ? "" : "/_/backend"))
-      ).replace(/\/$/, "") + "/pricing",
-    )
+    fetch(apiUrl("/pricing"))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("pricing"))))
       .then((data: PricingModel[]) => {
         if (!cancelled) setModels(data);
@@ -79,7 +75,13 @@ export default function Home() {
       return;
     }
     setError("");
-    const params = new URLSearchParams({ repo: url, cpd: String(callsPerDay) });
+    // Clamp calls/day so a cleared field or stray paste can't hand the
+    // backend a 0 or NaN.
+    const cpd = Math.max(
+      1,
+      Math.min(10_000_000, Number.isFinite(callsPerDay) ? callsPerDay : 1000),
+    );
+    const params = new URLSearchParams({ repo: url, cpd: String(cpd) });
     navigate(`/analysis?${params.toString()}`, {
       state: {
         githubToken: token || null,

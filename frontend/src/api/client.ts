@@ -10,12 +10,12 @@ import type { CostReport, StreamEvent } from "../types";
  * - Override either via `VITE_API_BASE` at build time if you're deploying the
  *   backend somewhere other than under that prefix.
  */
-const API_BASE = (
+export const API_BASE = (
   (import.meta.env.VITE_API_BASE as string | undefined) ??
   (import.meta.env.DEV ? "" : "/_/backend")
 ).replace(/\/$/, "");
 
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   return API_BASE + path;
 }
 
