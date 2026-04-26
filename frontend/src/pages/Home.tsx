@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, ChevronDown, GitBranch, KeyRound } from "lucide-react";
+import { ArrowUpRight, ChevronDown, GitBranch, History, KeyRound, X } from "lucide-react";
 import { providerMeta } from "../lib/providers";
 import { apiUrl } from "../api/client";
+import {
+  getRecentScans,
+  pushRecentScan,
+  removeRecentScan,
+  shortRepoLabel,
+  type RecentScan,
+} from "../utils/recentScans";
 
 /**
  * Landing page — editorial layout inspired by the cost-clarity-hub design:
@@ -33,6 +40,10 @@ export default function Home() {
   const [useAi, setUseAi] = useState(false);
   const [aiKey, setAiKey] = useState("");
   const [error, setError] = useState("");
+  // Lazy initializer reads localStorage exactly once on mount — avoids the
+  // extra render an effect would trigger and keeps SSR-safe (this app is a
+  // SPA, but the same shape is correct anywhere).
+  const [recents, setRecents] = useState<RecentScan[]>(() => getRecentScans());
 
   // Live pricing catalog — populates the Models section + the coverage card.
   const [models, setModels] = useState<PricingModel[] | null>(null);
@@ -81,6 +92,7 @@ export default function Home() {
       1,
       Math.min(10_000_000, Number.isFinite(callsPerDay) ? callsPerDay : 1000),
     );
+    pushRecentScan(url);
     const params = new URLSearchParams({ repo: url, cpd: String(cpd) });
     navigate(`/analysis?${params.toString()}`, {
       state: {
@@ -211,6 +223,44 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            {recents.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1.5 text-muted-foreground opacity-60">
+                  <History className="size-3" />
+                  Recent
+                </span>
+                {recents.map((r) => {
+                  const label = shortRepoLabel(r.url);
+                  return (
+                    <span
+                      key={r.url}
+                      className="group inline-flex items-center gap-0 rounded-full border border-border bg-card/40 transition-colors hover:bg-card"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRepoFragment(label);
+                          submit(r.url);
+                        }}
+                        className="rounded-l-full py-1 pl-2.5 pr-1.5 font-mono text-muted-foreground hover:text-foreground"
+                        aria-label={`Re-analyze ${label}`}
+                      >
+                        {label}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRecents(removeRecentScan(r.url))}
+                        className="rounded-r-full py-1 pl-1 pr-2 text-muted-foreground/60 hover:text-foreground"
+                        aria-label={`Remove ${label} from recent scans`}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Advanced — GitHub token + AI recommender */}
             <div className="mt-4">
