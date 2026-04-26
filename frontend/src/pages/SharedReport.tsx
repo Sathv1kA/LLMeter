@@ -7,6 +7,7 @@ import ReportView from "../components/ReportView";
 import ShareButton from "../components/ShareButton";
 import { SummarySkeleton, TableSkeleton, CallTableSkeleton } from "../components/Skeleton";
 import { downloadJson, downloadMarkdown, downloadPdf } from "../utils/exporters";
+import CompareButton from "../components/CompareButton";
 
 type Phase = "loading" | "done" | "error";
 
@@ -115,6 +116,7 @@ export default function SharedReport() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ShareButton reportId={id} />
+            <CompareButton reportId={id} />
             {report.total_call_sites > 0 && (
               <div className="relative">
                 <button

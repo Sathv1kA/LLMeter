@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 const Home = lazy(() => import("./pages/Home"));
 const Analysis = lazy(() => import("./pages/Analysis"));
 const SharedReport = lazy(() => import("./pages/SharedReport"));
+const Compare = lazy(() => import("./pages/Compare"));
 
 function PageFallback() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/analysis" element={<Analysis />} />
           <Route path="/r/:id" element={<SharedReport />} />
+          <Route path="/compare" element={<Compare />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

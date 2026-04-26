@@ -30,6 +30,7 @@ import { providerMeta } from "../lib/providers";
 import { CountUp } from "../components/CountUp";
 import ReportView from "../components/ReportView";
 import ShareButton from "../components/ShareButton";
+import CompareButton from "../components/CompareButton";
 import { downloadJson, downloadMarkdown, downloadPdf } from "../utils/exporters";
 
 type AnalysisNavState = {
@@ -176,6 +177,7 @@ export default function Analysis() {
           rightSlot={
             <div className="flex items-center gap-2">
               {reportId && <ShareButton reportId={reportId} />}
+              {reportId && <CompareButton reportId={reportId} />}
               {report.total_call_sites > 0 && (
                 <div className="relative">
                   <button
