@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import re
 from typing import Optional
 from urllib.parse import urlparse
@@ -14,6 +15,8 @@ import httpx
 
 from config import settings
 from utils.file_filter import should_scan_file
+
+log = logging.getLogger(__name__)
 
 GITHUB_API = "https://api.github.com"
 HEADERS_BASE = {
@@ -148,7 +151,10 @@ async def fetch_repo_files(
                     if item["path"].endswith(".ipynb"):
                         content = _extract_notebook_code(content)
                     return {"path": path, "content": content}
-                except Exception:
+                except Exception as exc:
+                    # One file failing shouldn't abort the scan, but losing it
+                    # silently makes "scanned 39 files, got 12 back" confusing.
+                    log.debug("fetch_one failed for %s: %s", item.get("path"), exc)
                     return None
 
         tasks = [fetch_one(item) for item in scannable]

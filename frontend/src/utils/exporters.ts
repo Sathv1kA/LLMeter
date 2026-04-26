@@ -62,7 +62,7 @@ function buildMarkdown(report: CostReport, repoName: string): string {
   const lines: string[] = [];
 
   lines.push(`# LLM Cost Report: ${repoName}`, "");
-  lines.push(`> Generated ${generated} by **AI Cost Modeling Platform**`, "");
+  lines.push(`> Generated ${generated} by **TokenLens**`, "");
   lines.push(`**Repository:** ${report.repo_url}`, "");
 
   lines.push("## Summary", "");

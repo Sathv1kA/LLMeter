@@ -89,30 +89,37 @@ async def _stream_analysis(req: AnalyzeRequest):
 
     fetch_task = asyncio.create_task(fetch_wrapper())
 
-    while True:
-        item = await progress_queue.get()
-        if item[0] is SENTINEL:
-            break
-        _, done, total = item
-        yield json.dumps({"type": "progress", "files_scanned": done, "total": total}) + "\n"
-
     try:
-        files, truncated, owner, repo = await fetch_task
-    except ValueError as e:
-        yield json.dumps({"type": "error", "message": str(e)}) + "\n"
-        return
-    except httpx.HTTPStatusError as e:
-        yield json.dumps({
-            "type": "error",
-            "message": _friendly_http_error(e, has_token=bool(effective_token)),
-        }) + "\n"
-        return
-    except httpx.RequestError as e:
-        yield json.dumps({"type": "error", "message": f"Network error contacting GitHub: {e}"}) + "\n"
-        return
-    except Exception as e:
-        yield json.dumps({"type": "error", "message": f"Unexpected error: {e}"}) + "\n"
-        return
+        while True:
+            item = await progress_queue.get()
+            if item[0] is SENTINEL:
+                break
+            _, done, total = item
+            yield json.dumps({"type": "progress", "files_scanned": done, "total": total}) + "\n"
+
+        try:
+            files, truncated, owner, repo = await fetch_task
+        except ValueError as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+            return
+        except httpx.HTTPStatusError as e:
+            yield json.dumps({
+                "type": "error",
+                "message": _friendly_http_error(e, has_token=bool(effective_token)),
+            }) + "\n"
+            return
+        except httpx.RequestError as e:
+            yield json.dumps({"type": "error", "message": f"Network error contacting GitHub: {e}"}) + "\n"
+            return
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": f"Unexpected error: {e}"}) + "\n"
+            return
+    finally:
+        # If the client disconnects mid-stream the generator is closed and
+        # `fetch_task` may still be running. Cancel it so we don't keep
+        # hammering the GitHub API in the background.
+        if not fetch_task.done():
+            fetch_task.cancel()
 
     yield json.dumps({"type": "progress", "stage": "scanning", "files_scanned": len(files)}) + "\n"
 

@@ -227,34 +227,45 @@ export default function Home() {
               {showAdvanced && (
                 <div className="mt-3 space-y-4 rounded-md border border-border bg-card/40 p-4 text-sm">
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    <label
+                      htmlFor="github-token"
+                      className="text-xs uppercase tracking-wider text-muted-foreground"
+                    >
                       GitHub token
                       <span className="ml-2 normal-case opacity-60">
                         optional — lifts rate limits & opens private repos
                       </span>
                     </label>
                     <input
+                      id="github-token"
                       type="password"
+                      autoComplete="off"
                       value={token}
                       onChange={(e) => setToken(e.target.value)}
                       placeholder="ghp_..."
+                      aria-label="GitHub personal access token (optional)"
                       className="mt-1 w-full rounded-sm border border-border bg-background/40 px-3 py-2 font-mono text-xs outline-none placeholder:text-muted-foreground/50 focus:border-primary/50"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    <label
+                      htmlFor="calls-per-day"
+                      className="text-xs uppercase tracking-wider text-muted-foreground"
+                    >
                       Daily call volume
                       <span className="ml-2 normal-case opacity-60">
                         for projections
                       </span>
                     </label>
                     <input
+                      id="calls-per-day"
                       type="number"
                       value={callsPerDay}
                       onChange={(e) => setCallsPerDay(Number(e.target.value))}
                       min={1}
                       max={10_000_000}
+                      aria-label="Daily call volume for cost projections"
                       className="mt-1 w-full rounded-sm border border-border bg-background/40 px-3 py-2 font-mono text-xs tabular-nums outline-none focus:border-primary/50"
                     />
                   </div>
